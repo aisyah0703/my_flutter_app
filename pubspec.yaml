@@ -11,7 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  supabase_flutter: ^2.6.0
+  supabase_flutter: ^2.6.0 # Pastikan versi ini sudah benar
+  image_picker: ^1.0.7
 
 dev_dependencies:
   flutter_test:
@@ -20,3 +21,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - peminjaman_app/assets/images/logo.png

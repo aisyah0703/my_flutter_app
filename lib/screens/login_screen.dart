@@ -9,18 +9,17 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Controller untuk menangkap input user
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  
+
   bool _isObscured = true;
   bool _isLoading = false;
 
-  // Fungsi Inti: Handle Login & Role-Based Redirect
   Future<void> _handleLogin() async {
-    // Validasi input kosong
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showErrorSnackBar("Email dan Password tidak boleh kosong");
+    // 1. Validasi Input
+    if (_emailController.text.trim().isEmpty ||
+        _passwordController.text.trim().isEmpty) {
+      _showErrorSnackBar("Email dan Password tidak boleh kosong!");
       return;
     }
 
@@ -29,27 +28,31 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final supabase = Supabase.instance.client;
 
-      // 1. Autentikasi ke Supabase Auth
+      // 2. Autentikasi ke Supabase Auth
       final AuthResponse response = await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
       if (response.user != null) {
-        // 2. Ambil Role dari tabel 'profiles' berdasarkan UID user yang login
-        // Pastikan nama tabel di Supabase adalah 'profiles'
+        // 3. Ambil Role dari tabel 'profiles'
+        // maybeSingle() mencegah error jika ID user belum ada di tabel profiles
         final userData = await supabase
             .from('profiles')
             .select('role')
             .eq('id', response.user!.id)
-            .single();
+            .maybeSingle();
 
-        final String role = userData['role'];
+        if (userData == null) {
+          throw "User terdaftar di Auth, tapi data Role di tabel 'profiles' tidak ditemukan.";
+        }
+
+        final String role = userData['role'].toString().toLowerCase();
 
         if (!mounted) return;
 
-        // 3. Navigasi sesuai Role
-        // Pastikan nama rute ini sudah terdaftar di main.dart
+        // 4. Navigasi Berdasarkan Role
+        // Pastikan nama rute ini sama dengan yang ada di main.dart
         if (role == 'admin') {
           Navigator.pushReplacementNamed(context, '/admin_dashboard');
         } else if (role == 'petugas') {
@@ -57,13 +60,15 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (role == 'peminjam') {
           Navigator.pushReplacementNamed(context, '/peminjam_dashboard');
         } else {
-          _showErrorSnackBar("Akses ditolak: Role tidak dikenali");
+          _showErrorSnackBar("Role '$role' tidak dikenali.");
         }
       }
     } on AuthException catch (error) {
       _showErrorSnackBar("Login Gagal: ${error.message}");
     } catch (error) {
-      _showErrorSnackBar("Terjadi kesalahan sistem");
+      // Menampilkan error teknis asli (seperti tabel tidak ditemukan atau RLS)
+      _showErrorSnackBar("Kesalahan: $error");
+      print("Error Detail: $error");
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -95,7 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
                   'HAI, SELAMAT DATANG!',
@@ -109,32 +113,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 Image.asset(
                   'assets/images/logo.png',
                   height: 180,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.image, size: 100, color: Colors.grey),
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.account_circle,
+                    size: 150,
+                    color: Color(0xFF4A90E2),
+                  ),
                 ),
                 const SizedBox(height: 50),
-
-                // Field Email
-                _buildInputField(
-                  label: "Email",
-                  hint: "Masukkan Email",
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-
+                _buildField("Email", _emailController, false),
                 const SizedBox(height: 20),
-
-                // Field Password
-                _buildInputField(
-                  label: "Password",
-                  hint: "Masukkan Password",
-                  controller: _passwordController,
-                  isPassword: true,
-                ),
-
+                _buildField("Password", _passwordController, true),
                 const SizedBox(height: 40),
-
-                // Tombol LOGIN
                 SizedBox(
                   width: double.infinity,
                   height: 55,
@@ -145,7 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      elevation: 2,
                     ),
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
@@ -153,9 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             "LOGIN",
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
                             ),
                           ),
                   ),
@@ -168,14 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Widget Helper Reusable untuk Input
-  Widget _buildInputField({
-    required String label,
-    required String hint,
-    required TextEditingController controller,
-    bool isPassword = false,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
+  Widget _buildField(String label, TextEditingController ctrl, bool isPass) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -188,29 +167,21 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 8),
         TextField(
-          controller: controller,
-          obscureText: isPassword ? _isObscured : false,
-          keyboardType: keyboardType,
+          controller: ctrl,
+          obscureText: isPass ? _isObscured : false,
           decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-            suffixIcon: isPassword
+            suffixIcon: isPass
                 ? IconButton(
                     icon: Icon(
-                      _isObscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                      color: Colors.grey,
+                      _isObscured ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () => setState(() => _isObscured = !_isObscured),
                   )
                 : null,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFD1E3F8), width: 1.5),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFF4A90E2), width: 1.5),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 15,
             ),
           ),
         ),
