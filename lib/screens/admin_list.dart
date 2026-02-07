@@ -1,6 +1,30 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://njvzpnhphwgopndbcnlp.supabase.co',
+    anonKey: 'sb_publishable_mr3yGlqywVH03rrar4441A_wX63s8ap',
+  );
+
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(useMaterial3: true),
+      home: const AdminListPage(),
+    );
+  }
+}
 
 class AdminListPage extends StatefulWidget {
   const AdminListPage({super.key});
@@ -10,141 +34,131 @@ class AdminListPage extends StatefulWidget {
 }
 
 class _AdminListPageState extends State<AdminListPage> {
-  final ImagePicker _picker = ImagePicker();
-
-  // ================== DATA ==================
-  List<Map<String, dynamic>> allProducts = [
-    {
-      'id': 1,
-      'name': 'Laptop',
-      'cat': 'komputer',
-      'stok': '10',
-      'desc': 'High end laptop',
-      'status': 'Tersedia',
-      'img': null,
-    },
-    {
-      'id': 2,
-      'name': 'Keyboard',
-      'cat': 'komputer',
-      'stok': '5',
-      'desc': 'Mechanical keyboard',
-      'status': 'Tersedia',
-      'img': null,
-    },
-    {
-      'id': 3,
-      'name': 'Mouse',
-      'cat': 'komputer',
-      'stok': '20',
-      'desc': 'Gaming mouse',
-      'status': 'Tersedia',
-      'img': null,
-    },
-    {
-      'id': 4,
-      'name': 'Lan Tester',
-      'cat': 'jaringan',
-      'stok': '8',
-      'desc': 'Tester kabel LAN',
-      'status': 'Tersedia',
-      'img': null,
-    },
-    {
-      'id': 5,
-      'name': 'Crimping tools',
-      'cat': 'jaringan',
-      'stok': '6',
-      'desc': 'Tang crimping',
-      'status': 'Tersedia',
-      'img': null,
-    },
-    {
-      'id': 6,
-      'name': 'Kabel LAN',
-      'cat': 'jaringan',
-      'stok': '50',
-      'desc': 'Cat 6',
-      'status': 'Tersedia',
-      'img': null,
-    },
-  ];
-
-  List<Map<String, dynamic>> categories = [
-    {'name': 'komputer'},
-    {'name': 'jaringan'},
-  ];
-
+  final supabase = Supabase.instance.client;
   String selectedCategory = 'semua kategori';
   String searchQuery = "";
 
-  // ================== FILTER ==================
-  List<Map<String, dynamic>> get filteredProducts {
-    return allProducts.where((p) {
-      final matchCat =
-          selectedCategory == 'semua kategori' || p['cat'] == selectedCategory;
-      final matchSearch = p['name'].toLowerCase().contains(
-        searchQuery.toLowerCase(),
-      );
-      return matchCat && matchSearch;
-    }).toList();
+  // Stream data dari tabel 'alat' secara realtime
+  late final Stream<List<Map<String, dynamic>>> _productStream = supabase
+      .from('alat')
+      .stream(primaryKey: ['id_alat']);
+
+  // Fungsi Hapus Produk
+  Future<void> _deleteProduct(int id) async {
+    await supabase.from('alat').delete().match({'id_alat': id});
   }
 
-  // ================== IMAGE PICKER ==================
-  Future<File?> _pickImage() async {
-    final XFile? img = await _picker.pickImage(source: ImageSource.gallery);
-    if (img == null) return null;
-    return File(img.path);
-  }
+  // Fungsi Tambah Produk Baru dengan Kategori
+  void _showAddProductDialog() {
+    final nameController = TextEditingController();
+    final stokController = TextEditingController();
+    int? kategoriId;
 
-  // ================== UI ==================
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          _header(),
-          _categoryTabs(),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: filteredProducts.length,
-              itemBuilder: (_, i) => _productCard(filteredProducts[i]),
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Tambah Alat Baru"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: "Nama Alat"),
             ),
+            TextField(
+              controller: stokController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: "Jumlah Stok"),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<int>(
+              decoration: const InputDecoration(labelText: "Pilih Kategori"),
+              items: const [
+                DropdownMenuItem(value: 1, child: Text("Komputer")),
+                DropdownMenuItem(value: 2, child: Text("Jaringan")),
+              ],
+              onChanged: (value) => kategoriId = value,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Batal"),
           ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton.small(
-            heroTag: "cat",
-            backgroundColor: const Color(0xFFAEE2FF),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CategoryPage(categories: categories),
-                ),
-              );
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty && kategoriId != null) {
+                await supabase.from('alat').insert({
+                  'nama_alat': nameController.text,
+                  'stok_total': int.parse(stokController.text),
+                  'stok_tersedia': int.parse(stokController.text),
+                  'id_kategori': kategoriId,
+                  'url_gambar': '', // Bisa diisi URL gambar default
+                });
+                if (mounted) Navigator.pop(context);
+              }
             },
-            child: const Icon(Icons.grid_view, color: Colors.black),
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            heroTag: "add",
-            backgroundColor: const Color(0xFFAEE2FF),
-            onPressed: () => _showFormModal(),
-            child: const Icon(Icons.add, color: Colors.black),
+            child: const Text("Simpan"),
           ),
         ],
       ),
     );
   }
 
-  // ================== HEADER ==================
-  Widget _header() {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        children: [
+          _header(context),
+          _categoryTabs(),
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _productStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text("Tidak ada data produk"));
+                }
+
+                final allProducts = snapshot.data!;
+
+                // LOGIKA FILTER: Pencarian + Kategori
+                final filtered = allProducts.where((p) {
+                  final matchSearch = p['nama_alat']
+                      .toString()
+                      .toLowerCase()
+                      .contains(searchQuery.toLowerCase());
+
+                  bool matchCat = true;
+                  if (selectedCategory == 'komputer') {
+                    matchCat = p['id_kategori'] == 1;
+                  } else if (selectedCategory == 'jaringan') {
+                    matchCat = p['id_kategori'] == 2;
+                  }
+
+                  return matchSearch && matchCat;
+                }).toList();
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) => _productCard(filtered[i]),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: _buildFab(),
+    );
+  }
+
+  Widget _header(BuildContext context) {
     return Stack(
       children: [
         Container(
@@ -160,8 +174,8 @@ class _AdminListPageState extends State<AdminListPage> {
           child: Column(
             children: [
               Row(
-                children: const [
-                  CircleAvatar(
+                children: [
+                  const CircleAvatar(
                     radius: 25,
                     backgroundColor: Color(0xFF4A90E2),
                     child: Text(
@@ -173,8 +187,8 @@ class _AdminListPageState extends State<AdminListPage> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 15),
-                  Column(
+                  const SizedBox(width: 15),
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -217,6 +231,7 @@ class _AdminListPageState extends State<AdminListPage> {
                 hintText: "cari nama barang....",
                 prefixIcon: Icon(Icons.search),
                 border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
               ),
             ),
           ),
@@ -225,7 +240,6 @@ class _AdminListPageState extends State<AdminListPage> {
     );
   }
 
-  // ================== CATEGORY ==================
   Widget _categoryTabs() {
     final tabs = ['semua kategori', 'komputer', 'jaringan'];
     return Padding(
@@ -258,19 +272,22 @@ class _AdminListPageState extends State<AdminListPage> {
     );
   }
 
-  // ================== PRODUCT CARD ==================
   Widget _productCard(Map<String, dynamic> p) {
+    String labelKategori = p['id_kategori'] == 1
+        ? "Komputer"
+        : (p['id_kategori'] == 2 ? "Jaringan" : "Umum");
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black12,
             blurRadius: 10,
-            offset: const Offset(0, 4),
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -283,9 +300,17 @@ class _AdminListPageState extends State<AdminListPage> {
               color: Colors.grey[200],
               borderRadius: BorderRadius.circular(8),
             ),
-            child: p['img'] == null
-                ? const Icon(Icons.image, color: Colors.grey)
-                : Image.file(p['img'], fit: BoxFit.cover),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: p['url_gambar'] == null || p['url_gambar'] == ""
+                  ? const Icon(Icons.image, color: Colors.grey)
+                  : Image.network(
+                      p['url_gambar'],
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image),
+                    ),
+            ),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -293,18 +318,26 @@ class _AdminListPageState extends State<AdminListPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  p['name'],
+                  p['nama_alat'] ?? "",
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                   ),
                 ),
                 Text(
-                  p['cat'],
+                  labelKategori,
+                  style: const TextStyle(
+                    color: Color(0xFF1A3668),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  "Stok: ${p['stok_tersedia'] ?? 0}",
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.check_circle, color: Colors.green, size: 12),
                     SizedBox(width: 5),
                     Text(
@@ -318,18 +351,13 @@ class _AdminListPageState extends State<AdminListPage> {
           ),
           Column(
             children: [
-              _actionBtn(
-                Icons.edit,
-                "Edit",
-                Colors.blue,
-                () => _showFormModal(product: p),
-              ),
+              _actionBtn(Icons.edit, "Edit", Colors.blue, () {}),
               const SizedBox(height: 6),
               _actionBtn(
                 Icons.delete,
                 "Hapus",
                 Colors.red,
-                () => _deleteProduct(p['id']),
+                () => _deleteProduct(p['id_alat']),
               ),
             ],
           ),
@@ -365,150 +393,24 @@ class _AdminListPageState extends State<AdminListPage> {
     );
   }
 
-  // ================== MODAL ==================
-  void _showFormModal({Map<String, dynamic>? product}) {
-    final isEdit = product != null;
-
-    final nameCtrl = TextEditingController(
-      text: isEdit ? product!['name'] : "",
-    );
-    final stokCtrl = TextEditingController(
-      text: isEdit ? product!['stok'] : "",
-    );
-    final descCtrl = TextEditingController(
-      text: isEdit ? product!['desc'] : "",
-    );
-
-    String category = isEdit ? product!['cat'] : 'komputer';
-    File? image = isEdit ? product!['img'] : null;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => StatefulBuilder(
-        builder: (_, setModal) => Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: () async {
-                    final img = await _pickImage();
-                    if (img != null) setModal(() => image = img);
-                  },
-                  child: Container(
-                    height: 140,
-                    width: 140,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: image == null
-                        ? const Icon(Icons.image, size: 60)
-                        : Image.file(image!, fit: BoxFit.cover),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                _input("Nama", nameCtrl),
-                _input("Stok", stokCtrl),
-                DropdownButtonFormField<String>(
-                  value: category,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'komputer',
-                      child: Text("komputer"),
-                    ),
-                    DropdownMenuItem(
-                      value: 'jaringan',
-                      child: Text("jaringan"),
-                    ),
-                  ],
-                  onChanged: (v) => setModal(() => category = v!),
-                  decoration: const InputDecoration(labelText: "Kategori"),
-                ),
-                _input("Deskripsi", descCtrl),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A3668),
-                    minimumSize: const Size(double.infinity, 45),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      if (isEdit) {
-                        final i = allProducts.indexWhere(
-                          (e) => e['id'] == product!['id'],
-                        );
-                        allProducts[i] = {
-                          ...product!,
-                          'name': nameCtrl.text,
-                          'stok': stokCtrl.text,
-                          'desc': descCtrl.text,
-                          'cat': category,
-                          'img': image,
-                        };
-                      } else {
-                        allProducts.add({
-                          'id': DateTime.now().millisecondsSinceEpoch,
-                          'name': nameCtrl.text,
-                          'stok': stokCtrl.text,
-                          'desc': descCtrl.text,
-                          'cat': category,
-                          'status': 'Tersedia',
-                          'img': image,
-                        });
-                      }
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: Text(isEdit ? "Simpan" : "Tambah"),
-                ),
-              ],
-            ),
-          ),
+  Widget _buildFab() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton.small(
+          heroTag: "cat",
+          backgroundColor: const Color(0xFFAEE2FF),
+          onPressed: () {},
+          child: const Icon(Icons.grid_view, color: Colors.black),
         ),
-      ),
-    );
-  }
-
-  Widget _input(String label, TextEditingController c) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
-      child: TextField(
-        controller: c,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        const SizedBox(height: 10),
+        FloatingActionButton(
+          heroTag: "add",
+          backgroundColor: const Color(0xFFAEE2FF),
+          onPressed: _showAddProductDialog,
+          child: const Icon(Icons.add, color: Colors.black),
         ),
-      ),
-    );
-  }
-
-  void _deleteProduct(int id) {
-    setState(() => allProducts.removeWhere((e) => e['id'] == id));
-  }
-}
-
-// ================== CATEGORY PAGE ==================
-class CategoryPage extends StatelessWidget {
-  final List<Map<String, dynamic>> categories;
-  const CategoryPage({super.key, required this.categories});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Kategori")),
-      body: ListView.builder(
-        itemCount: categories.length,
-        itemBuilder: (_, i) => ListTile(
-          leading: const Icon(Icons.folder),
-          title: Text(categories[i]['name']),
-        ),
-      ),
+      ],
     );
   }
 }

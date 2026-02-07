@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-// Pastikan path import ini benar
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/admin_list.dart';
-import 'screens/admin_form.dart'; // File yang berisi MainNavigation & Dashboard
+import 'screens/admin_form.dart';
 import 'screens/petugas_list.dart';
 import 'screens/peminjam_list.dart';
+import 'screens/logout_admin.dart';
+import 'screens/detail_persetujuan.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,16 +33,11 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF5F5F5),
       ),
-
       home: const SplashScreen(),
-
       routes: {
         '/login': (context) => const LoginScreen(),
-        // PERBAIKAN DI SINI:
-        // Gunakan MainNavigation agar muncul Dashboard + Bottom Nav
         '/admin_dashboard': (context) => const MainNavigation(),
-        '/petugas_dashboard': (context) => const PetugasDashboard(),
-        '/peminjam_dashboard': (context) => const PeminjamDashboard(),
+        // Route lainnya tetap sama
       },
     );
   }
