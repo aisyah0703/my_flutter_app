@@ -3,11 +3,16 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 class PetugasDashboard extends StatefulWidget {
+  final int
+  currentIndex; // Menangkap index dari BottomNavigationBar di main.dart
+
   const PetugasDashboard({
     super.key,
     required String nama,
     required String barang,
     required String jumlah,
+    this.currentIndex = 0,
+    required String mode,
   });
 
   @override
@@ -15,8 +20,7 @@ class PetugasDashboard extends StatefulWidget {
 }
 
 class _PetugasDashboardState extends State<PetugasDashboard> {
-  // State Navigasi
-  int _currentIndex = 0;
+  // State Navigasi Internal
   int _activeTabPeminjam = 0;
   bool _isViewingApprovalList = false;
   bool _isViewingDetailForm = false;
@@ -58,7 +62,7 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
   }
 
   // =========================================================
-  // LOGIKA DIALOG TOLAK (SESUAI GAMBAR BARU)
+  // LOGIKA DIALOG TOLAK
   // =========================================================
   void _showTolakDendaDialog() {
     showDialog(
@@ -75,7 +79,7 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
           ),
         ),
         content: const Text(
-          "denda keterlambatan pengembalian",
+          "Tolak pengajuan atau denda keterlambatan pengembalian ini?",
           style: TextStyle(fontSize: 16),
         ),
         actions: [
@@ -107,7 +111,11 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
                 ),
                 onPressed: () {
                   Navigator.pop(context);
-                  setState(() => _isValidatingPayment = false);
+                  setState(() {
+                    _isValidatingPayment = false;
+                    _isViewingDetailForm = false;
+                    _isViewingApprovalList = false;
+                  });
                 },
                 child: const Text("Iya", style: TextStyle(color: Colors.white)),
               ),
@@ -119,7 +127,7 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
   }
 
   // =========================================================
-  // TAMPILAN VALIDASI DENDA (SAMA PERSIS GAMBAR)
+  // TAMPILAN VALIDASI DENDA (MODAL/DETAIL)
   // =========================================================
   Widget _buildValidasiDendaBody() {
     return SingleChildScrollView(
@@ -127,7 +135,6 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
         children: [
           _buildHeaderDendaWithEdit(),
           const SizedBox(height: 60),
-
           if (_isPaymentSuccess) ...[
             const Icon(Icons.check_circle, color: Colors.green, size: 40),
             const Text(
@@ -140,7 +147,6 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
             ),
             const SizedBox(height: 10),
           ],
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Column(
@@ -152,9 +158,7 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
                   "Tenggat pengembalian",
                   "kamis, 3 Februari 2026",
                 ),
-
                 const SizedBox(height: 20),
-                // Ringkasan Pembayaran Card
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -182,7 +186,6 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 40),
                 Row(
                   children: [
@@ -213,6 +216,172 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
       ),
     );
   }
+
+  // =========================================================
+  // TAMPILAN BERANDA (INDEX 0)
+  // =========================================================
+  Widget _buildBerandaBody() {
+    if (_isViewingDetailForm) return _buildDetailFormPersetujuan();
+    if (_isViewingApprovalList) {
+      return Column(
+        children: [
+          const SizedBox(height: 50),
+          _buildTopNav(
+            "Menunggu persetujuan",
+            () => setState(() => _isViewingApprovalList = false),
+          ),
+          const SizedBox(height: 30),
+          _buildCardBerandaStyle(
+            "Claraa",
+            "Mouse",
+            "Pinjam 28 - 29 Jan 2026",
+            "Sewa 3",
+            true,
+          ),
+        ],
+      );
+    }
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildHeaderBlue(),
+          const SizedBox(height: 20),
+          _buildStatistikRow(),
+          const SizedBox(height: 25),
+          _buildSubTitle("Menunggu Persetujuan"),
+          _buildCardBerandaStyle(
+            "Claraa",
+            "Mouse",
+            "Pinjam 28 - 29 Jan 2026",
+            "Sewa 3",
+            true,
+          ),
+          const SizedBox(height: 15),
+          _buildSubTitle("Pengembalian Hari ini"),
+          _buildCardBerandaStyle(
+            "Elingga",
+            "Lan tester",
+            "Kembali, 27 Jan 2026",
+            "Sewa 1",
+            false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================
+  // TAMPILAN PEMINJAM (INDEX 1)
+  // =========================================================
+  Widget _buildPeminjamBody() {
+    return Column(
+      children: [
+        _buildHeaderBlue(),
+        const SizedBox(height: 20),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildTabItem("Pengembalian", 0),
+            _buildTabItem("Selesai", 1),
+            _buildTabItem("Denda", 2),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: 2,
+            itemBuilder: (context, index) {
+              if (_activeTabPeminjam == 0) return _buildCardPengembalian();
+              if (_activeTabPeminjam == 1) return _buildCardSelesai();
+              return _buildCardDenda();
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =========================================================
+  // DETAIL FORM PERSETUJUAN
+  // =========================================================
+  Widget _buildDetailFormPersetujuan() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildHeaderWithMouseImage(),
+          const SizedBox(height: 80),
+          if (_isSuccessApproved) ...[
+            const Icon(Icons.check_circle, color: Colors.green, size: 80),
+            const SizedBox(height: 10),
+            const Text(
+              "Pengajuan Disetujui!",
+              style: TextStyle(
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 35),
+            child: Column(
+              children: [
+                _buildInputLabel("Nama", _selectedUser),
+                _buildInputLabel("Jumlah", "2"),
+                _buildInputDropdown(
+                  "Ambil",
+                  _format(_tglAmbil),
+                  () => _pilihTanggalAmbil(context),
+                ),
+                _buildInputDropdown("Kembali", _format(_tglKembali), null),
+                _buildInputDropdown(
+                  "Tenggat pengembalian",
+                  _format(_tglKembali),
+                  null,
+                ),
+                const SizedBox(height: 30),
+                if (!_isSuccessApproved)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildBtnAction(
+                          "Tolak",
+                          Colors.grey[300]!,
+                          Colors.black,
+                          _showTolakDendaDialog,
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _buildBtnAction(
+                          "Setuju",
+                          const Color(0xFF1A3668),
+                          Colors.white,
+                          () => setState(() => _isSuccessApproved = true),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  _buildBtnAction("Selesai", Colors.green, Colors.white, () {
+                    setState(() {
+                      _isViewingDetailForm = false;
+                      _isSuccessApproved = false;
+                    });
+                  }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================
+  // WIDGET HELPERS (ALL ORIGINAL CODES MAINTAINED)
+  // =========================================================
 
   Widget _buildHeaderDendaWithEdit() {
     return Stack(
@@ -315,234 +484,6 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
     );
   }
 
-  // =========================================================
-  // CODE LAMA (TIDAK DIHAPUS)
-  // =========================================================
-  Widget _buildBerandaBody() {
-    if (_isViewingDetailForm) return _buildDetailFormPersetujuan();
-    if (_isViewingApprovalList) {
-      return Column(
-        children: [
-          const SizedBox(height: 50),
-          _buildTopNav(
-            "Menunggu persetujuan",
-            () => setState(() => _isViewingApprovalList = false),
-          ),
-          const SizedBox(height: 30),
-          _buildCardBerandaStyle(
-            "Claraa",
-            "Mouse",
-            "Pinjam 28 - 29 Jan 2026",
-            "Sewa 3",
-            true,
-          ),
-        ],
-      );
-    }
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildHeaderBlue(),
-          const SizedBox(height: 20),
-          _buildStatistikRow(),
-          const SizedBox(height: 25),
-          _buildSubTitle("Menunggu Persetujuan"),
-          _buildCardBerandaStyle(
-            "Claraa",
-            "Mouse",
-            "Pinjam 28 - 29 Jan 2026",
-            "Sewa 3",
-            true,
-          ),
-          const SizedBox(height: 15),
-          _buildSubTitle("Pengembalian Hari ini"),
-          _buildCardBerandaStyle(
-            "Elingga",
-            "Lan tester",
-            "Kembali, 27 Jan 2026",
-            "Sewa 1",
-            false,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPeminjamBody() {
-    return Column(
-      children: [
-        _buildHeaderBlue(),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildTabItem("Pengembalian", 0),
-            _buildTabItem("Selesai", 1),
-            _buildTabItem("Denda", 2),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: 2,
-            itemBuilder: (context, index) {
-              if (_activeTabPeminjam == 0) return _buildCardPengembalian();
-              if (_activeTabPeminjam == 1) return _buildCardSelesai();
-              return _buildCardDenda();
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailFormPersetujuan() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildHeaderWithMouseImage(),
-          const SizedBox(height: 80),
-          if (_isSuccessApproved) ...[
-            const Icon(Icons.check_circle, color: Colors.green, size: 80),
-            const SizedBox(height: 10),
-            const Text(
-              "Pengajuan Disetujui!",
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 35),
-            child: Column(
-              children: [
-                _buildInputLabel("Nama", _selectedUser),
-                _buildInputLabel("Jumlah", "2"),
-                _buildInputDropdown(
-                  "Ambil",
-                  _format(_tglAmbil),
-                  () => _pilihTanggalAmbil(context),
-                ),
-                _buildInputDropdown("Kembali", _format(_tglKembali), null),
-                _buildInputDropdown(
-                  "Tenggat pengembalian",
-                  _format(_tglKembali),
-                  null,
-                ),
-                const SizedBox(height: 30),
-                if (!_isSuccessApproved)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildBtnAction(
-                          "Tolak",
-                          Colors.grey[300]!,
-                          Colors.black,
-                          () {},
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: _buildBtnAction(
-                          "Setuju",
-                          const Color(0xFF1A3668),
-                          Colors.white,
-                          () => setState(() => _isSuccessApproved = true),
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  _buildBtnAction("Selesai", Colors.green, Colors.white, () {
-                    setState(() {
-                      _isViewingDetailForm = false;
-                      _isSuccessApproved = false;
-                    });
-                  }),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- WIDGET HELPER ---
-  Widget _buildCardDenda() => _buildBaseCardPeminjam(
-    chips: [_buildStatusChip("💸 Denda Rp 5.000", Colors.red)],
-    showBtn: true,
-  );
-
-  Widget _buildBaseCardPeminjam({
-    required List<Widget> chips,
-    bool showBtn = false,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.mouse),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "clara sunde",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      "peminjam@gmail.com",
-                      style: TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const Divider(height: 20),
-          const Text("mouse", style: TextStyle(fontWeight: FontWeight.bold)),
-          const Text(
-            "Kembali : 15/01/2026",
-            style: TextStyle(fontSize: 10, color: Colors.grey),
-          ),
-          const SizedBox(height: 10),
-          Row(children: chips),
-          if (showBtn)
-            Align(
-              alignment: Alignment.centerRight,
-              child: _buildSmallBtn(
-                "Validasi Pembayaran",
-                const Color(0xFF1A3668),
-                () => setState(() => _isValidatingPayment = true),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHeaderBlue() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 40, 20, 25),
@@ -598,51 +539,6 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildHeaderWithMouseImage() {
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          height: 130,
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A3668),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(40),
-              bottomRight: Radius.circular(40),
-            ),
-          ),
-          child: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => setState(() => _isViewingDetailForm = false),
-            ),
-          ),
-        ),
-        Positioned(
-          top: 70,
-          child: Container(
-            height: 120,
-            width: 120,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
-                BoxShadow(color: Colors.black12, blurRadius: 10),
-              ],
-            ),
-            child: const Center(
-              child: Icon(Icons.mouse, size: 60, color: Color(0xFF1A3668)),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -770,13 +666,14 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
                   _buildSmallBtn(
                     "Setuju",
                     const Color(0xFF2E7D32),
-                    () => setState(() {
-                      _isViewingDetailForm = true;
-                      _isSuccessApproved = false;
-                    }),
+                    () => setState(() => _isViewingDetailForm = true),
                   ),
                   const SizedBox(width: 20),
-                  _buildSmallBtn("Tolak", const Color(0xFFD32F2F), () {}),
+                  _buildSmallBtn(
+                    "Tolak",
+                    const Color(0xFFD32F2F),
+                    _showTolakDendaDialog,
+                  ),
                 ] else
                   _buildSmallBtn("Selesai", const Color(0xFF2E7D32), () {}),
               ],
@@ -954,6 +851,72 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
     );
   }
 
+  Widget _buildBaseCardPeminjam({
+    required List<Widget> chips,
+    bool showBtn = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.mouse),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "clara sunde",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      "peminjam@gmail.com",
+                      style: TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          const Text("mouse", style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text(
+            "Kembali : 15/01/2026",
+            style: TextStyle(fontSize: 10, color: Colors.grey),
+          ),
+          const SizedBox(height: 10),
+          Row(children: chips),
+          if (showBtn)
+            Align(
+              alignment: Alignment.centerRight,
+              child: _buildSmallBtn(
+                "Validasi Pembayaran",
+                const Color(0xFF1A3668),
+                () => setState(() => _isValidatingPayment = true),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCardPengembalian() => _buildBaseCardPeminjam(
     chips: [
       _buildStatusChip("⚠️ Terlambat 1 Hari", Colors.red),
@@ -964,34 +927,83 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
   Widget _buildCardSelesai() => _buildBaseCardPeminjam(
     chips: [_buildStatusChip("✅ Dikembalikan", Colors.green)],
   );
+  Widget _buildCardDenda() => _buildBaseCardPeminjam(
+    chips: [_buildStatusChip("💸 Denda Rp 5.000", Colors.red)],
+    showBtn: true,
+  );
 
+  Widget _buildHeaderWithMouseImage() {
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          height: 130,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFF1A3668),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+          ),
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => setState(() => _isViewingDetailForm = false),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 70,
+          child: Container(
+            height: 120,
+            width: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 10),
+              ],
+            ),
+            child: const Center(
+              child: Icon(Icons.mouse, size: 60, color: Color(0xFF1A3668)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =========================================================
+  // FUNGSI BUILD UTAMA (LOGIKA NAVIGASI)
+  // =========================================================
   @override
   Widget build(BuildContext context) {
     Widget currentBody;
+
+    // Logika Alur Tampilan
     if (_isValidatingPayment) {
       currentBody = _buildValidasiDendaBody();
     } else {
-      currentBody = _currentIndex == 0
-          ? _buildBerandaBody()
-          : _buildPeminjamBody();
+      // Menentukan tampilan berdasarkan index dari Navbar di main.dart
+      switch (widget.currentIndex) {
+        case 0:
+          currentBody = _buildBerandaBody();
+          break;
+        case 1:
+          currentBody = _buildPeminjamBody();
+          break;
+        default:
+          currentBody = _buildBerandaBody();
+      }
     }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: currentBody,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() {
-          _currentIndex = index;
-          _isViewingDetailForm = false;
-          _isViewingApprovalList = false;
-          _isValidatingPayment = false;
-          _isPaymentSuccess = false;
-        }),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF1A3668),
-        items: const [],
-      ),
     );
   }
 }

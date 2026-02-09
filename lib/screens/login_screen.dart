@@ -36,11 +36,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.user != null) {
         // 3. Ambil Role dari tabel 'profiles'
-        // maybeSingle() mencegah error jika ID user belum ada di tabel profiles
+        // PERBAIKAN: Menggunakan kolom 'user_id' sesuai screenshot database kamu
         final userData = await supabase
             .from('profiles')
             .select('role')
-            .eq('id', response.user!.id)
+            .eq(
+              'user_id',
+              response.user!.id,
+            ) // Perubahan dari 'id' ke 'user_id'
             .maybeSingle();
 
         if (userData == null) {
@@ -52,7 +55,6 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!mounted) return;
 
         // 4. Navigasi Berdasarkan Role
-        // Pastikan nama rute ini sama dengan yang ada di main.dart
         if (role == 'admin') {
           Navigator.pushReplacementNamed(context, '/admin_dashboard');
         } else if (role == 'petugas') {
@@ -66,7 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } on AuthException catch (error) {
       _showErrorSnackBar("Login Gagal: ${error.message}");
     } catch (error) {
-      // Menampilkan error teknis asli (seperti tabel tidak ditemukan atau RLS)
       _showErrorSnackBar("Kesalahan: $error");
       print("Error Detail: $error");
     } finally {
@@ -103,21 +104,14 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const Text(
                   'HAI, SELAMAT DATANG!',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    fontFamily: 'Serif',
-                  ),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 40),
-                Image.asset(
-                  'assets/images/logo.png',
-                  height: 180,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.account_circle,
-                    size: 150,
-                    color: Color(0xFF4A90E2),
-                  ),
+                // Gunakan Icon jika asset belum diatur di pubspec.yaml
+                const Icon(
+                  Icons.account_circle,
+                  size: 150,
+                  color: Color(0xFF4A90E2),
                 ),
                 const SizedBox(height: 50),
                 _buildField("Email", _emailController, false),

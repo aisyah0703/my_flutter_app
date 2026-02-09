@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/screens/admin_form.dart';
+import 'package:flutter_application_1/screens/logout_petugas.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Import semua file yang dibutuhkan
@@ -93,15 +94,22 @@ class PetugasMainWrapper extends StatefulWidget {
 
 class _PetugasMainWrapperState extends State<PetugasMainWrapper> {
   int _currentIndex = 0;
+  // Di dalam PetugasMainWrapper (main.dart)
   final List<Widget> _pages = [
     const PetugasDashboard(
       nama: 'Petugas',
+      mode: 'beranda',
       barang: '',
       jumlah: '',
-    ), // Beranda Biru
-    const PeminjamDashboard(),
+    ), // Mode Beranda
+    const PetugasDashboard(
+      nama: 'Petugas',
+      mode: 'peminjam',
+      barang: '',
+      jumlah: '',
+    ), // Mode Peminjam
     const Center(child: Text("Halaman Status")),
-    const LogoutAdmin(),
+    const LogoutPetugas(),
   ];
 
   @override
