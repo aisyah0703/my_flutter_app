@@ -37,7 +37,6 @@ class _AdminListPageState extends State<AdminListPage> {
   String searchQuery = "";
   final ImagePicker _picker = ImagePicker();
 
-  // Stream untuk update data secara otomatis (Realtime)
   late final Stream<List<Map<String, dynamic>>> _productStream = supabase
       .from('alat')
       .stream(primaryKey: ['id_alat']);
@@ -325,7 +324,6 @@ class _AdminListPageState extends State<AdminListPage> {
                             minimumSize: const Size(0, 50),
                           ),
                           onPressed: () async {
-                            // Tampilkan loading jika perlu
                             String? finalUrl = isEdit
                                 ? product['url_gambar']
                                 : "";
@@ -418,15 +416,11 @@ class _AdminListPageState extends State<AdminListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(
-          bottom: 10,
-        ), // Memberi jarak agar tidak menutupi navbar
-        child: FloatingActionButton(
-          backgroundColor: const Color(0xFFAEE2FF),
-          onPressed: () => _showFormAlat(),
-          child: const Icon(Icons.add, color: Colors.black),
-        ),
+      // PERBAIKAN: Tidak menggunakan padding ekstra, biarkan default
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFFAEE2FF),
+        onPressed: () => _showFormAlat(),
+        child: const Icon(Icons.add, color: Colors.black),
       ),
       body: Column(
         children: [
@@ -436,10 +430,12 @@ class _AdminListPageState extends State<AdminListPage> {
             child: StreamBuilder<List<Map<String, dynamic>>>(
               stream: _productStream,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
-                if (!snapshot.hasData || snapshot.data!.isEmpty)
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Center(child: Text("Data Kosong"));
+                }
 
                 final filtered = snapshot.data!.where((p) {
                   final matchSearch = p['nama_alat']
@@ -447,15 +443,21 @@ class _AdminListPageState extends State<AdminListPage> {
                       .toLowerCase()
                       .contains(searchQuery.toLowerCase());
                   bool matchCat = true;
-                  if (selectedCategory == 'komputer')
+                  if (selectedCategory == 'komputer') {
                     matchCat = p['id_kategori'] == 1;
-                  else if (selectedCategory == 'jaringan')
+                  } else if (selectedCategory == 'jaringan') {
                     matchCat = p['id_kategori'] == 2;
+                  }
                   return matchSearch && matchCat;
                 }).toList();
 
+                // PERBAIKAN: Padding bottom yang cukup untuk FAB
                 return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    bottom: 100, // Cukup untuk FAB + navbar
+                  ),
                   itemCount: filtered.length,
                   itemBuilder: (_, i) => _productCard(filtered[i]),
                 );
@@ -464,7 +466,7 @@ class _AdminListPageState extends State<AdminListPage> {
           ),
         ],
       ),
-      // NAVBAR DIKEMBALIKAN KE TEMPATNYA AGAR TIDAK BERTUMPUK
+      // PASTIKAN HANYA ADA SATU BottomNavigationBar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF1A3668),
@@ -481,7 +483,6 @@ class _AdminListPageState extends State<AdminListPage> {
     );
   }
 
-  // --- Widget Header, CategoryTabs, ProductCard tetap sama secara desain ---
   Widget _header(BuildContext context) {
     return Stack(
       children: [
@@ -548,7 +549,9 @@ class _AdminListPageState extends State<AdminListPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(25),
-              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black12, blurRadius: 5),
+              ],
             ),
             child: TextField(
               onChanged: (v) => setState(() => searchQuery = v),

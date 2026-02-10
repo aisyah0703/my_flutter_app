@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 const Color kNavyColor = Color(0xFF1A3668);
 const Color kGreenColor = Color(0xFF5BA66B);
 
-// --- DASHBOARD TETAP SAMA (TIDAK DIKURANGI) ---
 class PeminjamDashboard extends StatefulWidget {
   const PeminjamDashboard({super.key});
 
@@ -40,8 +39,12 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: fetchAlat(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text("Barang tidak tersedia"));
+                }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: snapshot.data!.length,
@@ -53,11 +56,10 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(),
+      // Bottom Navigation Bar dihapus di sini
     );
   }
 
-  // Header melengkung
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(25, 60, 25, 40),
@@ -77,14 +79,11 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Davita123",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
+                  Text("Davita123",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
                   Text("peminjam", style: TextStyle(color: Colors.white70)),
                 ],
               ),
@@ -121,10 +120,8 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: ActionChip(
-              label: Text(
-                label,
-                style: TextStyle(color: isSelected ? Colors.white : kNavyColor),
-              ),
+              label: Text(label,
+                  style: TextStyle(color: isSelected ? Colors.white : kNavyColor)),
               backgroundColor: isSelected ? kNavyColor : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -145,12 +142,8 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4)),
         ],
       ),
       child: Row(
@@ -161,14 +154,10 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  item['nama_alat'] ?? '-',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const Text("-", style: TextStyle(color: Colors.grey)),
+                Text(item['nama_alat'] ?? '-',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                Text("Stok: ${item['stok'] ?? 0}",
+                    style: const TextStyle(color: Colors.grey)),
               ],
             ),
           ),
@@ -176,30 +165,16 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
             icon: const Icon(Icons.add_shopping_cart, color: kNavyColor),
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (context) => FormPengajuan(item: item),
-              ),
+              MaterialPageRoute(builder: (context) => FormPengajuan(item: item)),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: kNavyColor,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: "Beranda"),
-        BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: "Produk"),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profil"),
-      ],
-    );
-  }
 }
 
-// --- FORM PENGAJUAN (Sesuai Desain image_e4559f.png) ---
+// --- FORM PENGAJUAN ---
 class FormPengajuan extends StatefulWidget {
   final Map<String, dynamic> item;
   const FormPengajuan({super.key, required this.item});
@@ -213,20 +188,28 @@ class _FormPengajuanState extends State<FormPengajuan> {
   final _jumlahController = TextEditingController(text: "1");
   DateTime? tglPinjam;
   DateTime? tglTenggat;
+  bool _isLoading = false;
 
-  // Logika simpan menggunakan kolom 'tgl_tenggat'
   Future<void> _submit() async {
-    if (tglPinjam == null || tglTenggat == null || _namaController.text.isEmpty)
+    if (tglPinjam == null || tglTenggat == null || _namaController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Harap lengkapi semua data!")));
       return;
+    }
+
+    setState(() => _isLoading = true);
 
     try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+
       await Supabase.instance.client.from('peminjaman').insert({
         'nama_peminjam': _namaController.text,
         'nama_barang': widget.item['nama_alat'],
         'jumlah': int.tryParse(_jumlahController.text) ?? 1,
-        'tgl_pinjam': tglPinjam!.toIso8601String(),
-        'tgl_tenggat': tglTenggat!.toIso8601String(),
+        'tgl_pinjam': DateFormat('EEEE, d MMMM yyyy').format(tglPinjam!),
+        'tgl_tenggat': DateFormat('EEEE, d MMMM yyyy').format(tglTenggat!),
         'status': 'Menunggu',
+        'id_user': userId,
       });
 
       if (mounted) {
@@ -244,9 +227,10 @@ class _FormPengajuanState extends State<FormPengajuan> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Terjadi kesalahan: $e")));
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -257,112 +241,93 @@ class _FormPengajuanState extends State<FormPengajuan> {
       appBar: AppBar(
         backgroundColor: kNavyColor,
         elevation: 0,
-        title: const Text(
-          "Form Pengajuan",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text("Form Pengajuan", style: TextStyle(color: Colors.white)),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              height: 40,
-              decoration: const BoxDecoration(
-                color: kNavyColor,
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(30),
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : SingleChildScrollView(
+            child: Column(
+              children: [
+                Container(
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: kNavyColor,
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+                  ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(25),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Data Barang yang anda Pinjam",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  _label("Alat"),
-                  _input(initial: widget.item['nama_alat'], enabled: false),
-                  _label("Jumlah Alat"),
-                  _input(controller: _jumlahController),
-                  _label("Tanggal pinjam"),
-                  _dateBox(tglPinjam, (d) => setState(() => tglPinjam = d)),
-                  _label("Tanggal pengembalian"),
-                  _dateBox(tglTenggat, (d) => setState(() => tglTenggat = d)),
-                  _label("Data peminjam"),
-                  const Text(
-                    "( sertakan nama , kelas, dan nomer telepon)",
-                    style: TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                  _input(controller: _namaController, maxLines: 3),
-                  const SizedBox(height: 30),
-                  ElevatedButton(
-                    onPressed: _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kNavyColor,
-                      minimumSize: const Size(double.infinity, 55),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+                Padding(
+                  padding: const EdgeInsets.all(25),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Data Barang yang anda Pinjam",
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      _label("Alat"),
+                      _input(initial: widget.item['nama_alat'], enabled: false),
+                      _label("Jumlah Alat"),
+                      _input(controller: _jumlahController, keyboardType: TextInputType.number),
+                      _label("Tanggal pinjam"),
+                      _dateBox(tglPinjam, (d) => setState(() => tglPinjam = d)),
+                      _label("Tanggal pengembalian"),
+                      _dateBox(tglTenggat, (d) => setState(() => tglTenggat = d)),
+                      _label("Data peminjam"),
+                      const Text("( sertakan nama, kelas, dan nomor telepon)",
+                          style: TextStyle(fontSize: 10, color: Colors.grey)),
+                      const SizedBox(height: 5),
+                      _input(controller: _namaController, maxLines: 3),
+                      const SizedBox(height: 30),
+                      ElevatedButton(
+                        onPressed: _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kNavyColor,
+                          minimumSize: const Size(double.infinity, 55),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        child: const Text("+ Ajukan Peminjaman",
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
-                    ),
-                    child: const Text(
-                      "+ Ajukan Peminjaman",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
   Widget _label(String t) => Padding(
-    padding: const EdgeInsets.only(top: 15, bottom: 5),
-    child: Text(
-      t,
-      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-    ),
-  );
+        padding: const EdgeInsets.only(top: 15, bottom: 5),
+        child: Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+      );
 
   Widget _input({
     String? initial,
     TextEditingController? controller,
     bool enabled = true,
     int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
   }) {
     return Container(
+      margin: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
         ],
       ),
       child: TextField(
         controller: controller ?? TextEditingController(text: initial),
         enabled: enabled,
         maxLines: maxLines,
+        keyboardType: keyboardType,
         decoration: InputDecoration(
-          fillColor: Colors.white,
+          fillColor: enabled ? Colors.white : Colors.grey[200],
           filled: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: const EdgeInsets.all(15),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         ),
       ),
     );
@@ -380,21 +345,18 @@ class _FormPengajuanState extends State<FormPengajuan> {
         if (picked != null) onPick(picked);
       },
       child: Container(
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: Colors.black45),
+          border: Border.all(color: Colors.black12),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              d == null
-                  ? "Pilih Tanggal"
-                  : DateFormat('EEEE, d MMMM yyyy').format(d),
-            ),
-            const Icon(Icons.calendar_month_outlined),
+            Text(d == null ? "Pilih Tanggal" : DateFormat('EEEE, d MMMM yyyy').format(d)),
+            const Icon(Icons.calendar_month_outlined, color: kNavyColor),
           ],
         ),
       ),
@@ -402,7 +364,7 @@ class _FormPengajuanState extends State<FormPengajuan> {
   }
 }
 
-// --- HALAMAN SUKSES (Sesuai image_e3cdda.png) ---
+// --- HALAMAN SUKSES ---
 class SuccessPage extends StatelessWidget {
   final String alat, jml, nama;
   final DateTime tglP, tglT;
@@ -424,18 +386,15 @@ class SuccessPage extends StatelessWidget {
           Column(
             children: [
               Container(
-                height: 180,
+                height: 200,
                 width: double.infinity,
                 color: kNavyColor,
                 child: const Center(
-                  child: Text(
-                    "Pengajuan Berhasil",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: Text("Pengajuan Berhasil",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 70),
@@ -445,14 +404,8 @@ class SuccessPage extends StatelessWidget {
                   children: [
                     _tile("Alat", alat),
                     _tile("Jumlah Alat", jml),
-                    _tile(
-                      "Tanggal pinjam",
-                      DateFormat('EEEE, d MMMM yyyy').format(tglP),
-                    ),
-                    _tile(
-                      "Tanggal pengembalian",
-                      DateFormat('EEEE, d MMMM yyyy').format(tglT),
-                    ),
+                    _tile("Tanggal pinjam", DateFormat('EEEE, d MMMM yyyy').format(tglP)),
+                    _tile("Tanggal pengembalian", DateFormat('EEEE, d MMMM yyyy').format(tglT)),
                     _tile("Data peminjam", nama),
                     const SizedBox(height: 20),
                     Container(
@@ -462,35 +415,27 @@ class SuccessPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Center(
-                        child: Text(
-                          "silahkan tunggu pengajuan",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        child: Text("Silahkan tunggu konfirmasi petugas",
+                            style: TextStyle(
+                                color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                     ),
+                    TextButton(
+                      onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+                      child: const Text("Kembali ke Beranda", style: TextStyle(color: kNavyColor)),
+                    )
                   ],
                 ),
               ),
             ],
           ),
           Positioned(
-            top: 130,
+            top: 150,
             left: MediaQuery.of(context).size.width / 2 - 50,
             child: const CircleAvatar(
               radius: 50,
               backgroundColor: kGreenColor,
               child: Icon(Icons.check, color: Colors.white, size: 70),
-            ),
-          ),
-          Positioned(
-            top: 45,
-            left: 15,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
             ),
           ),
         ],
@@ -499,22 +444,19 @@ class SuccessPage extends StatelessWidget {
   }
 
   Widget _tile(String l, String v) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        l,
-        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-      ),
-      Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(top: 5, bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.black26),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(v),
-      ),
-    ],
-  );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 5, bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.black12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(v, style: const TextStyle(color: Colors.black87)),
+          ),
+        ],
+      );
 }
