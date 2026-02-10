@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/models/pinjam_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../models/pinjam_model.dart';
+import 'package:intl/intl.dart'; // Pastikan sudah tambah intl di pubspec.yaml
 
+// ==========================================================
+// 1. DASHBOARD PEMINJAM (BERANDA)
+// ==========================================================
 class PeminjamDashboard extends StatefulWidget {
   const PeminjamDashboard({super.key});
 
@@ -13,151 +15,393 @@ class PeminjamDashboard extends StatefulWidget {
 class _PeminjamDashboardState extends State<PeminjamDashboard> {
   final _supabase = Supabase.instance.client;
 
+  // Fungsi ambil data dari tabel 'alat'
+  Future<List<Map<String, dynamic>>> fetchAlat() async {
+    final response = await _supabase.from('alat').select();
+    return List<Map<String, dynamic>>.from(response);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: Column(
         children: [
-          // --- HEADER BIRU MELENGKUNG (Sesuai Gambar) ---
-          Container(
-            height: 220,
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Color(0xFF1A3668),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(40),
-                bottomRight: Radius.circular(40),
+          _buildHeader(), // Header Biru Gelap
+          _buildCategoryTabs(), // Tab Kategori
+          Expanded(
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: fetchAlat(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text("Data alat kosong"));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: snapshot.data!.length,
+                  itemBuilder: (context, index) {
+                    final item = snapshot.data![index];
+                    return _buildProductCard(context, item);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.only(top: 50, left: 25, right: 25, bottom: 30),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A3668),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Colors.blue,
+                child: Text('D', style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Davita123',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'peminjam',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'hallo mau sewa alat apa ????',
+            style: TextStyle(color: Colors.white, fontSize: 15),
+          ),
+          const SizedBox(height: 15),
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'cari nama barang....',
+              prefixIcon: const Icon(Icons.search),
+              fillColor: Colors.white,
+              filled: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(30),
+                borderSide: BorderSide.none,
               ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 50),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const CircleAvatar(
-                      backgroundColor: Color(0xFF4A90E2),
-                      child: Text('D', style: TextStyle(color: Colors.white)),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Davita123', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                        Text('peminjam', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 25),
-                const Center(
-                  child: Text(
-                    'hallo mau sewa alat apa ????',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontStyle: FontStyle.italic),
-                  ),
-                ),
-                const SizedBox(height: 15),
-                // Search Bar Putih
-                Container(
-                  height: 40,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                  child: const TextField(
-                    decoration: InputDecoration(
-                      hintText: 'cari nama barang...',
-                      prefixIcon: Icon(Icons.search, size: 20),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
-
-          // --- TAB KATEGORI ---
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildTab('semua kategori', true),
-                _buildTab('komputer', false),
-                _buildTab('jaringan', false),
-              ],
-            ),
-          ),
-
-          // --- LIST BARANG ---
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                _buildItemCard('Laptop', 'Komputer', true),
-                _buildItemCard('Keyboard', 'Komputer', true),
-                _buildItemCard('Mouse', 'Komputer', true),
-                _buildItemCard('Lan Tester', 'Jaringan', true),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
-          BottomNavigationBarItem(icon: Icon(Icons.inventory_2), label: 'Produk'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
       ),
     );
   }
 
-  Widget _buildTab(String label, bool active) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFF4A90E2) : Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF4A90E2)),
+  Widget _buildCategoryTabs() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _categoryBtn("Semua Kategori", true),
+          _categoryBtn("komputer", false),
+          _categoryBtn("jaringan", false),
+        ],
       ),
-      child: Text(label, style: TextStyle(color: active ? Colors.white : const Color(0xFF4A90E2), fontSize: 12)),
     );
   }
 
-  Widget _buildItemCard(String title, String category, bool available) {
+  Widget _categoryBtn(String label, bool active) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+    decoration: BoxDecoration(
+      color: active ? const Color(0xFF1A3668) : Colors.white,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: const Color(0xFF1A3668)),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: active ? Colors.white : const Color(0xFF1A3668),
+        fontSize: 12,
+      ),
+    ),
+  );
+
+  Widget _buildProductCard(BuildContext context, Map<String, dynamic> item) {
     return GestureDetector(
-      onTap: () => _prosesPinjam(title), // Klik untuk pinjam
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => DetailAlat(item: item)),
+      ),
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          ],
         ),
         child: Row(
           children: [
             Container(
-              width: 70, height: 70,
-              decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(10)),
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: const Icon(Icons.image, color: Colors.grey),
             ),
             const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  Text(category, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 14),
-                      const SizedBox(width: 5),
-                      const Text('Tersedia', style: TextStyle(color: Colors.green, fontSize: 12)),
-                    ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['nama_alat'],
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                ],
+                ),
+                Text(
+                  item['kategori'] ?? 'Kategori',
+                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                Row(
+                  children: const [
+                    Icon(Icons.check_circle, color: Colors.green, size: 14),
+                    SizedBox(width: 5),
+                    Text(
+                      'Tersedia',
+                      style: TextStyle(color: Colors.green, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================================
+// 2. DETAIL ALAT
+// ==========================================================
+class DetailAlat extends StatelessWidget {
+  final Map<String, dynamic> item;
+  const DetailAlat({super.key, required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A3668),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Column(
+        children: [
+          const Expanded(
+            child: Icon(Icons.build_circle, size: 120, color: Colors.white),
+          ),
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['nama_alat'],
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  "Stok : ${item['stok']}",
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  "Spesifikasi : ${item['deskripsi'] ?? 'Alat ini digunakan untuk keperluan praktek.'}",
+                ),
+                const Divider(height: 30),
+                const Text(
+                  "Notes :",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                _noteRow("jangan merusak barang"),
+                _noteRow("jangan menjual barang"),
+                _noteRow("mengembalikan tepat waktu"),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00FFCC),
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => FormPengajuan(item: item),
+                    ),
+                  ),
+                  child: const Text(
+                    "Pinjam",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noteRow(String t) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      children: [
+        const Icon(Icons.warning, size: 16, color: Color(0xFF1A3668)),
+        const SizedBox(width: 10),
+        Text(t, style: const TextStyle(fontSize: 12)),
+      ],
+    ),
+  );
+}
+
+// ==========================================================
+// 3. FORM PENGGUNAAN (DISELESAIKAN)
+// ==========================================================
+class FormPengajuan extends StatefulWidget {
+  final Map<String, dynamic> item;
+  const FormPengajuan({super.key, required this.item});
+
+  @override
+  State<FormPengajuan> createState() => _FormPengajuanState();
+}
+
+class _FormPengajuanState extends State<FormPengajuan> {
+  final _supabase = Supabase.instance.client;
+  final _jmlController = TextEditingController();
+  final _noteController = TextEditingController();
+  DateTime? tglPinjam;
+  DateTime? tglKembali;
+
+  Future<void> _kirimData() async {
+    if (_jmlController.text.isEmpty || tglPinjam == null) return;
+    try {
+      await _supabase.from('peminjaman').insert({
+        'nama_peminjam': 'Davita123',
+        'nama_barang': widget.item['nama_alat'],
+        'jumlah': int.parse(_jmlController.text),
+        'tgl_pinjam': tglPinjam.toString(),
+        'tgl_kembali': tglKembali.toString(),
+        'notes': _noteController.text,
+        'status': 'Menunggu',
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Berhasil diajukan!")));
+        Navigator.popUntil(context, (route) => route.isFirst);
+      }
+    } catch (e) {
+      print("Error: $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A3668),
+      appBar: AppBar(
+        title: const Text(
+          "Form Pengajuan",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Container(
+        margin: const EdgeInsets.only(top: 20),
+        padding: const EdgeInsets.all(25),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: ListView(
+          children: [
+            const Text(
+              "Data Barang yang anda Pinjam",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            _inputLabel("Alat"),
+            TextField(
+              controller: TextEditingController(text: widget.item['nama_alat']),
+              enabled: false,
+              decoration: _inputDeco(),
+            ),
+            _inputLabel("Jumlah Alat"),
+            TextField(
+              controller: _jmlController,
+              keyboardType: TextInputType.number,
+              decoration: _inputDeco(),
+            ),
+            _inputLabel("Tanggal pinjam"),
+            _dateBox(tglPinjam, (d) => setState(() => tglPinjam = d)),
+            _inputLabel("Tanggal pengembalian"),
+            _dateBox(tglKembali, (d) => setState(() => tglKembali = d)),
+            _inputLabel("Data peminjam"),
+            TextField(
+              controller: _noteController,
+              maxLines: 3,
+              decoration: _inputDeco(),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A3668),
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: _kirimData,
+              child: const Text(
+                "+ Ajukan Peminjaman",
+                style: TextStyle(color: Colors.white),
               ),
             ),
           ],
@@ -166,33 +410,57 @@ class _PeminjamDashboardState extends State<PeminjamDashboard> {
     );
   }
 
-  // --- LOGIKA CREATE (PROSES PINJAM) ---
-  Future<void> _prosesPinjam(String namaBarang) async {
-    final confirm = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi Pinjam'),
-        content: Text('Apakah anda ingin meminjam $namaBarang?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Ya, Pinjam')),
+  // --- HELPER UNTUK MENGHINDARI ERROR BORDERSIDE ---
+  Widget _inputLabel(String l) => Padding(
+    padding: const EdgeInsets.only(top: 15, bottom: 8),
+    child: Text(
+      l,
+      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+    ),
+  );
+
+  InputDecoration _inputDeco() => InputDecoration(
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.all(15),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: Colors.grey.shade300),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: Color(0xFF1A3668)),
+    ),
+  );
+
+  Widget _dateBox(DateTime? dt, Function(DateTime) onPick) => InkWell(
+    onTap: () async {
+      final p = await showDatePicker(
+        context: context,
+        initialDate: DateTime.now(),
+        firstDate: DateTime.now(),
+        lastDate: DateTime(2027),
+      );
+      if (p != null) onPick(p);
+    },
+    child: Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            dt == null
+                ? "Pilih Tanggal"
+                : DateFormat('EEEE, d MMMM yyyy').format(dt),
+            style: TextStyle(color: dt == null ? Colors.grey : Colors.black),
+          ),
+          const Icon(Icons.calendar_month, color: Colors.grey),
         ],
       ),
-    );
-
-    if (confirm == true) {
-      final pinjamData = PeminjamanModel(
-        namaPeminjam: 'Davita123',
-        idBarang: 'B001', // Contoh ID
-        namaBarang: namaBarang,
-        tglPinjam: DateTime.now().toString(),
-      );
-
-      await _supabase.from('peminjaman').insert(pinjamData.toMap());
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Permintaan pinjam $namaBarang berhasil dikirim!')),
-      );
-    }
-  }
+    ),
+  );
 }
