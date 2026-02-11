@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 // ===========================================================================
 // MAIN DASHBOARD PETUGAS
@@ -72,14 +75,14 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
       ),
       child: Column(
         children: [
-          Row(
+          const Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 backgroundColor: Color(0xFF4A90E2),
                 child: Text("A", style: TextStyle(color: Colors.white)),
               ),
-              const SizedBox(width: 12),
-              const Column(
+              SizedBox(width: 12),
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
@@ -96,8 +99,8 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
                   ),
                 ],
               ),
-              const Spacer(),
-              const Icon(Icons.notifications, color: Colors.white),
+              Spacer(),
+              Icon(Icons.notifications, color: Colors.white),
             ],
           ),
           const SizedBox(height: 25),
@@ -124,7 +127,7 @@ class _PetugasDashboardState extends State<PetugasDashboard> {
 }
 
 // ===========================================================================
-// TAB 2: DATA PEMINJAM (DENGAN PENANGANAN ERROR NULL)
+// TAB 2: DATA PEMINJAM
 // ===========================================================================
 class TabDataPeminjam extends StatefulWidget {
   const TabDataPeminjam({super.key});
@@ -230,7 +233,6 @@ class _TabDataPeminjamState extends State<TabDataPeminjam> {
   }
 
   Widget _buildCardDinamis(Map<String, dynamic> item) {
-    // --- PENANGANAN DATA NULL AGAR TIDAK ERROR ---
     String namaPeminjam = item['nama_peminjam']?.toString() ?? "Tanpa Nama";
     String email = item['email']?.toString() ?? "Email tidak tersedia";
     String namaBarang = item['nama_barang']?.toString() ?? "Barang";
@@ -415,46 +417,203 @@ class _TabDataPeminjamState extends State<TabDataPeminjam> {
 }
 
 // ===========================================================================
-// TAB 3: STATUS (LAPORAN)
+// TAB 3: STATUS (DENGAN FITUR CETAK PDF)
 // ===========================================================================
 class TabStatus extends StatelessWidget {
   const TabStatus({super.key});
 
+  // FUNGSI UNTUK GENERATE PDF
+  Future<void> _generatePdf(
+    BuildContext context,
+    String title,
+    String statusFilter,
+  ) async {
+    final pdf = pw.Document();
+    final supabase = Supabase.instance.client;
+
+    try {
+      // Tampilkan loading spinner sederhana
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // Ambil data dari Supabase
+      final List<dynamic> data = await supabase
+          .from('peminjaman')
+          .select()
+          .eq('status', statusFilter);
+
+      // Tutup loading spinner
+      Navigator.pop(context);
+
+      if (data.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Data kosong, tidak ada yang bisa dicetak."),
+          ),
+        );
+        return;
+      }
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  title,
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                pw.Text(
+                  "Tanggal Laporan: ${DateTime.now().day}-${DateTime.now().month}-${DateTime.now().year}",
+                ),
+                pw.SizedBox(height: 10),
+                pw.Divider(),
+                pw.SizedBox(height: 20),
+                pw.TableHelper.fromTextArray(
+                  headers: ['Peminjam', 'Barang', 'Status', 'Tgl Kembali'],
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  cellAlignment: pw.Alignment.centerLeft,
+                  data: data
+                      .map(
+                        (item) => [
+                          item['nama_peminjam'] ?? '-',
+                          item['nama_barang'] ?? '-',
+                          item['status'] ?? '-',
+                          item['tgl_kembali'] ?? '-',
+                        ],
+                      )
+                      .toList(),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+      );
+    } catch (e) {
+      if (Navigator.canPop(context)) Navigator.pop(context);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Gagal mencetak: $e")));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(25),
-      children: [
-        _buildReportCard(
-          "Laporan Peminjam",
-          "Daftar semua data peminjaman",
-          Icons.access_time,
-        ),
-        const SizedBox(height: 20),
-        _buildReportCard(
-          "Laporan Kembali",
-          "Daftar perangkat telah kembali",
-          Icons.check_circle_outline,
-        ),
-      ],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FB),
+      body: Column(
+        children: [
+          // Header Biru yang konsisten dengan halaman lain
+          _buildSimpleHeader("Laporan Status"),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(25),
+              children: [
+                _buildReportCard(
+                  context,
+                  "card peminjam",
+                  "Laporan daftar peminjam perangkat",
+                  Icons.access_time_filled,
+                  () => _generatePdf(
+                    context,
+                    "Laporan Peminjaman Aktif",
+                    "Disetujui",
+                  ),
+                ),
+                const SizedBox(height: 25),
+                _buildReportCard(
+                  context,
+                  "card pengembalian",
+                  "Laporan daftar perangkat yang dikembalikan",
+                  Icons.check_circle,
+                  () => _generatePdf(
+                    context,
+                    "Laporan Pengembalian Selesai",
+                    "Selesai",
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildReportCard(String title, String desc, IconData icon) {
+  // Header Biru
+  Widget _buildSimpleHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(25, 60, 25, 30),
+      decoration: const BoxDecoration(
+        color: Color(0xFF142E5A), // kNavyColor
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(45)),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            backgroundColor: Colors.blue,
+            child: Text("P", style: TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget Kartu Laporan
+  Widget _buildReportCard(
+    BuildContext context,
+    String title,
+    String desc,
+    IconData icon,
+    VoidCallback onPrint,
+  ) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
         ],
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(icon, size: 40, color: Colors.black87),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 35, color: Colors.black87),
+              ),
               const SizedBox(width: 15),
               Expanded(
                 child: Column(
@@ -476,16 +635,19 @@ class TabStatus extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 20),
           ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: onPrint,
             icon: const Icon(Icons.print, color: Colors.white, size: 18),
             label: const Text(
               "Cetak Laporan",
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF5D9CEC),
+              backgroundColor: const Color(0xFF5D9CEC), // kBlueLight
               minimumSize: const Size(double.infinity, 45),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),

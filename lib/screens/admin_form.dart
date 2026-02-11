@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'admin_list.dart'; // File Produk kamu
 import 'logout_admin.dart'; // File Logout kamu
+import 'package:fl_chart/fl_chart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -60,101 +62,40 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final supabase = Supabase.instance.client;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- HEADER BIRU TUA (Sama persis dengan gambar) ---
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(25, 50, 25, 40),
-              decoration: const BoxDecoration(
-                color: Color(0xFF0D2149), // Biru gelap sesuai gambar
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(50),
-                  bottomRight: Radius.circular(50),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 28,
-                        backgroundColor: Color(0xFF6DA4D9),
-                        child: Text(
-                          "A",
-                          style: TextStyle(fontSize: 26, color: Colors.white),
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            "Aisyah Najwa",
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            "admin",
-                            style: TextStyle(color: Colors.white70),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  const Text(
-                    "Semangat Bekerja\nhari ini !!",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 26,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // --- HEADER ---
+            _buildHeader(),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
 
-            // --- BAGIAN GRAFIK ---
+            // --- GRAFIK BUNDAR DINAMIS ---
             const Text(
-              "Grafik Peminjan Bulanan",
+              "Alat Paling Banyak Dipinjam",
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            _buildChartSection(),
+            _buildPieChartSection(
+              supabase,
+            ), // Grafik berdasarkan frekuensi peminjaman
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 30),
 
-            // --- STAT CARD SECTION ---
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      _StatCard(title: "Total Alat", value: "6"),
-                      _StatCard(title: "Dipinjam", value: "2"),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const _StatCard(title: "Tersedia", value: "6"),
-                  ),
-                ],
-              ),
-            ),
+            // --- INFO BOX (Denda & Sinkronisasi) ---
+            _buildAdditionalInfo(supabase),
+
+            const SizedBox(height: 30),
+
+            // --- STAT CARD (Data Real-time dari Database) ---
+            _buildStatCards(
+              supabase,
+            ), // Sinkron dengan tabel 'alat' & 'peminjaman'
+
             const SizedBox(height: 40),
           ],
         ),
@@ -162,97 +103,218 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  // Widget Grafik dengan Sumbu dan Garis (Sesuai gambar)
-  Widget _buildChartSection() {
+  // Header tetap menggunakan desain biru tua Anda
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      height: 200,
-      child: Stack(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(25, 50, 25, 40),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D2149),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(50),
+          bottomRight: Radius.circular(50),
+        ),
+      ),
+      child: Column(
         children: [
-          // Garis-garis Horizontal dan Label Sumbu Y
-          Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(5, (index) {
-              int labelValue = (4 - index) * 10;
-              return Row(
-                children: [
-                  SizedBox(
-                    width: 25,
-                    child: Text(
-                      labelValue.toString(),
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 28,
+                backgroundColor: Color(0xFF6DA4D9),
+                child: Text(
+                  "A",
+                  style: TextStyle(fontSize: 26, color: Colors.white),
+                ),
+              ),
+              const SizedBox(width: 15),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "Aisyah Najwa",
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Expanded(
-                    child: Container(height: 1, color: Colors.grey[300]),
+                  Text(
+                    "Admin Petugas",
+                    style: TextStyle(color: Colors.white70),
                   ),
                 ],
-              );
-            }),
-          ),
-          // Batang Grafik
-          Padding(
-            padding: const EdgeInsets.only(left: 35, bottom: 20, right: 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: const [
-                _Bar(height: 40, label: "januari"),
-                _Bar(height: 65, label: "februari"),
-                _Bar(height: 75, label: "maret"),
-                _Bar(height: 100, label: "mei"),
-                _Bar(height: 65, label: "juni"),
-                _Bar(height: 30, label: "juli"),
-              ],
-            ),
-          ),
-          // Label Sumbu Y Vertikal
-          Positioned(
-            left: -35,
-            top: 60,
-            child: RotationTransition(
-              turns: const AlwaysStoppedAnimation(-90 / 360),
-              child: const Text(
-                "jumlah barang terpinjam",
-                style: TextStyle(fontSize: 8, color: Colors.grey),
               ),
-            ),
+            ],
           ),
-          // Label (perbulan) di bawah
-          const Align(
-            alignment: Alignment.bottomCenter,
-            child: Text(
-              "(perbulan)",
-              style: TextStyle(fontSize: 10, color: Colors.grey),
+          const SizedBox(height: 40),
+          const Text(
+            "Semangat Bekerja\nhari ini !!",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 26,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              height: 1.2,
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _Bar extends StatelessWidget {
-  final double height;
-  final String label;
-  const _Bar({required this.height, required this.label});
+  // Grafik Bundar yang menghitung jumlah alat dari tabel 'peminjaman'
+  Widget _buildPieChartSection(SupabaseClient supabase) {
+    return SizedBox(
+      height: 250,
+      child: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: supabase.from('peminjaman').stream(primaryKey: ['id']),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Container(
-          width: 28,
-          height: height,
-          decoration: BoxDecoration(
-            color: const Color(0xFF0D2149),
-            borderRadius: BorderRadius.circular(4),
+          final dataPeminjaman = snapshot.data!;
+
+          // Hitung frekuensi tiap alat
+          Map<String, int> counts = {};
+          for (var item in dataPeminjaman) {
+            String nama = item['nama_barang'] ?? 'Alat';
+            counts[nama] = (counts[nama] ?? 0) + 1;
+          }
+
+          final List<Color> colors = [
+            const Color(0xFF0D2149),
+            const Color(0xFF1B4B8A),
+            const Color(0xFF6DA4D9),
+            const Color(0xFFB3CDE0),
+          ];
+
+          return PieChart(
+            PieChartData(
+              sectionsSpace: 3,
+              centerSpaceRadius: 50,
+              sections: counts.entries.toList().asMap().entries.map((entry) {
+                int idx = entry.key;
+                return PieChartSectionData(
+                  color: colors[idx % colors.length],
+                  value: entry.value.value.toDouble(),
+                  title: '${entry.value.key}\n(${entry.value.value})',
+                  radius: 60,
+                  titleStyle: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Menampilkan Total Denda dari tabel 'pengembalian'
+  Widget _buildAdditionalInfo(SupabaseClient supabase) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: supabase.from('pengembalian').stream(primaryKey: ['id']),
+      builder: (context, snapshot) {
+        int totalDenda = 0;
+        if (snapshot.hasData) {
+          totalDenda = snapshot.data!.fold(
+            0,
+            (sum, item) => sum + (item['denda'] as int? ?? 0),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      "Status Database:",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    Text(
+                      "Terhubung",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 25),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Total Denda Terkumpul:",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    Text(
+                      "Rp $totalDenda",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: const TextStyle(fontSize: 9, color: Colors.grey)),
-      ],
+        );
+      },
+    );
+  }
+
+  // Statistik Real-time (Total, Dipinjam, Tersedia)
+  Widget _buildStatCards(SupabaseClient supabase) {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: supabase.from('alat').stream(primaryKey: ['id']),
+      builder: (context, snapAlat) {
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: supabase.from('peminjaman').stream(primaryKey: ['id']),
+          builder: (context, snapPinjam) {
+            int total = snapAlat.data?.length ?? 0;
+            int dipinjam = snapPinjam.data?.length ?? 0;
+            int tersedia = total - dipinjam;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _StatCard(title: "Total Alat", value: total.toString()),
+                      _StatCard(title: "Dipinjam", value: dipinjam.toString()),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _StatCard(
+                      title: "Tersedia",
+                      value: tersedia < 0 ? "0" : tersedia.toString(),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -272,7 +334,7 @@ class _StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -299,7 +361,7 @@ class _StatCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
                 ),
                 Text(
                   value,
